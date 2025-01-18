@@ -3026,10 +3026,10 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   // If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->isGeneric()) return true;
 
-  if (typealias->getUnderlyingType()->isEqual(
-        nominal->getSelfInterfaceType())) {
-    return true;
-  }
+//  if (typealias->getUnderlyingType()->isEqual(
+//        nominal->getSelfInterfaceType())) {
+//    return true;
+//  }
 
   return false;
 }

@@ -3102,7 +3102,8 @@ for (auto parameter = mutableTypealiasParams.rbegin();
     ++parameter;
   }
 }
-  
+ // check for size equality of these two new types , if true, succeed with std equal, if wrong, give upper
+ // if std equal check is fine, return isTypeInferredByTypealias
 
 
   // Check for inferred types.

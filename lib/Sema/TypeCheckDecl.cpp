@@ -3075,25 +3075,34 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   unsigned nominalMaxDepth = nominalGenericParams.back()->getDepth();
   unsigned typealiasMaxDepth = typealiasGenericParams.back()->getDepth();
   unsigned maxDepth = std::max(nominalMaxDepth, typealiasMaxDepth);
-  
-  for(auto parameter = nominalGenericParams.rbegin(); parameter !=  nominalGenericParams.rend();){
-  if((*parameter)->getDepth() == maxDepth){
-    auto it_to_erase = std::next(parameter).base();
-      parameter = std::reverse_iterator(nominalGenericParams.erase(it_to_erase));
-    } else {
-      ++parameter;
-    }
- 
-  }
 
-  for(auto parameter = typealiasGenericParams.rbegin(); parameter != typealiasGenericParams.rend();){
-  if((*parameter)->getDepth() == maxDepth){
-    auto it_to_erase = std::next(parameter).base();
-      parameter = std::reverse_iterator(typealiasGenericParams.erase(it_to_erase));
-    } else {
-      ++parameter;
-    }
+
+llvm::SmallVector<swift::GenericTypeParamType *, 4> mutableNominalParams(
+    nominalGenericParams.begin(), nominalGenericParams.end());
+
+for (auto parameter = mutableNominalParams.rbegin();
+     parameter != mutableNominalParams.rend(); ) {
+  if ((*parameter)->getDepth() == maxDepth) {
+    auto it_to_erase = std::next(parameter).base(); // base() gives forward iterator
+    parameter = std::reverse_iterator(mutableNominalParams.erase(it_to_erase));
+  } else {
+    ++parameter;
+  }
 }
+
+llvm::SmallVector<swift::GenericTypeParamType *, 4> mutableTypealiasParams(
+    typealiasGenericParams.begin(), typealiasGenericParams.end());
+
+for (auto parameter = mutableTypealiasParams.rbegin();
+     parameter != mutableTypealiasParams.rend(); ) {
+  if ((*parameter)->getDepth() == maxDepth) {
+    auto it_to_erase = std::next(parameter).base();
+    parameter = std::reverse_iterator(mutableTypealiasParams.erase(it_to_erase));
+  } else {
+    ++parameter;
+  }
+}
+  
 
 
   // Check for inferred types.

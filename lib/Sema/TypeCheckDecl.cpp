@@ -3078,15 +3078,22 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   
   for(auto parameter = nominalGenericParams.rbegin(); parameter !=  nominalGenericParams.rend();){
   if((*parameter)->getDepth() == maxDepth){
-    (*parameter)->erase(std::next(parameter).base());
-  }
+    auto it_to_erase = std::next(parameter).base();
+      parameter = std::reverse_iterator(nominalGenericParams.erase(it_to_erase));
+    } else {
+      ++parameter;
+    }
+ 
   }
 
   for(auto parameter = typealiasGenericParams.rbegin(); parameter != typealiasGenericParams.rend();){
   if((*parameter)->getDepth() == maxDepth){
-    (*parameter)->erase(std::next(parameter).base());
-  }
-  }
+    auto it_to_erase = std::next(parameter).base();
+      parameter = std::reverse_iterator(typealiasGenericParams.erase(it_to_erase));
+    } else {
+      ++parameter;
+    }
+}
 
 
   // Check for inferred types.

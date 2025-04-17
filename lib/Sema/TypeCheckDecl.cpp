@@ -3072,6 +3072,23 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   auto nominalGenericParams = nominalSig.getGenericParams();
   auto typealiasGenericParams = typealiasSig.getGenericParams();
 
+  unsigned nominalMaxDepth = nominalGenericParams.back()->getDepth();
+  unsigned typealiasMaxDepth = typealiasGenericParams.back()->getDepth();
+  unsigned maxDepth = std::max(nominalMaxDepth, typealiasMaxDepth);
+  
+  for(auto parameter = nominalGenericParams.rbegin(); parameter !=  nominalGenericParams.rend();){
+  if((*parameter)->getDepth() == maxDepth){
+    (*parameter)->erase(std::next(parameter).base());
+  }
+  }
+
+  for(auto parameter = typealiasGenericParams.rbegin(); parameter != typealiasGenericParams.rend();){
+  if((*parameter)->getDepth() == maxDepth){
+    (*parameter)->erase(std::next(parameter).base());
+  }
+  }
+
+
   // Check for inferred types.
   if (nominalGenericParams.size() != typealiasGenericParams.size())
     return isTypeInferredByTypealias(typealias, nominal);

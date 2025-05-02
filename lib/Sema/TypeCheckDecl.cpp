@@ -3107,17 +3107,22 @@ for (auto parameter = mutableTypealiasParams.rbegin();
 
 
   // Check for inferred types.
-  if (nominalGenericParams.size() != typealiasGenericParams.size())
-    return isTypeInferredByTypealias(typealias, nominal);
+  if (mutableNominalParams.size() != mutableTypealiasParams.size())
+    return false;
+  else{
+      if(mutableNominalParams.size() != 0 && mutableTypealiasParams.size() != 0)
+        return isTypeInferredByTypealias(typealias, nominal);
 
-  // Check that the type parameters are the same the whole way through.
-  if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
-                  typealiasGenericParams.begin(),
+      if (std::equal(mutableNominalParams.begin(), mutableNominalParams.end(),
+                   mutableTypealiasParams.begin(),
                   [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
                     return gp1->isEqual(gp2);
                   }))
-    return false;
-
+    return isTypeInferredByTypealias(typealias, nominal);
+  else{
+      return false;
+    }
+  }
   // If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->isGeneric()) return true;
 

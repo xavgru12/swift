@@ -3094,15 +3094,15 @@ llvm::SmallVector<swift::GenericTypeParamType *, 4> mutableTypealiasParams(
     if(mutableNominalParams.size() != 0 && mutableTypealiasParams.size() != 0)
       return isTypeInferredByTypealias(typealias, nominal);
 
-      if (std::equal(mutableNominalParams.begin(), mutableNominalParams.end(),
-                   mutableTypealiasParams.begin(),
-                  [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
-                    return gp1->isEqual(gp2);
-                  }))
-        return isTypeInferredByTypealias(typealias, nominal);
-      else{
-          return false;
-      }
+    if (std::equal(mutableNominalParams.begin(), mutableNominalParams.end(),
+                 mutableTypealiasParams.begin(),
+                [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
+                  return gp1->isEqual(gp2);
+                }))
+      return isTypeInferredByTypealias(typealias, nominal);
+    else{
+        return false;
+    }
   }
   // If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->isGeneric()) return true;

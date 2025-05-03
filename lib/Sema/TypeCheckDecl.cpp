@@ -3101,22 +3101,44 @@ llvm::SmallVector<swift::GenericTypeParamType *, 4> mutableTypealiasParams(
  // check for size equality of these two new types , if true, succeed with std equal, if wrong, give upper
  // if std equal check is fine, return isTypeInferredByTypealias
 
-
+// if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
+//                  typealiasGenericParams.begin(),
+//                  [&](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
+//                  if (!(gp1->getDepth() == maxDepth || gp2->getDepth() == maxDepth))
+//                    return gp1->isEqual(gp2);
+//                  else {
+//                    return true;
+//                    }
+////                    [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
+////                    return gp1->isEqual(gp2);
+//                  }))
+// {
+//   return true;
+// } else { // error appears at else case
+//   return false;
+// }
   // Check for inferred types.
   if (mutableNominalParams.size() != mutableTypealiasParams.size())
+  {
     return false;
-  else{
-    if (std::equal(mutableNominalParams.begin(), mutableNominalParams.end(),
-                 mutableTypealiasParams.begin(),
-                [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
-                  return gp1->isEqual(gp2);
-                }))
-      return isTypeInferredByTypealias(typealias, nominal);
-    else{
-        return false;
-    }
   }
-  // If neither is generic at this level, we have a pass-through typealias.
+  if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
+               typealiasGenericParams.begin(),
+              [&](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
+                if (!(gp1->getDepth() == maxDepth || gp2->getDepth() == maxDepth))
+                  return gp1->isEqual(gp2);
+                else {
+                  return true;
+                }
+              }))
+  {
+    return false;
+  }
+
+  if (nominalGenericParams.size() != typealiasGenericParams.size())
+    return isTypeInferredByTypealias(typealias, nominal);
+
+// If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->isGeneric()) return true;
 
   if (typealias->getUnderlyingType()->isEqual(

@@ -3084,12 +3084,19 @@ llvm::SmallVector<swift::GenericTypeParamType *, 4> mutableTypealiasParams(
     typealiasGenericParams.begin(), typealiasGenericParams.end());
 
 
-  //  for (const auto& type :types){
-  //    if (type->getDepth() == maxDepth)
-  //    {
-  //      types.pop_back();
-  //    }
-  //  }
+  for (const auto& type :mutableNominalParams){
+    if (type->getDepth() == maxDepth)
+    {
+      mutableTypealiasParams.pop_back();
+    }
+  }
+
+  for (const auto& type :mutableTypealiasParams){
+    if (type->getDepth() == maxDepth)
+    {
+      mutableTypealiasParams.pop_back();
+    }
+  }
 
  // check for size equality of these two new types , if true, succeed with std equal, if wrong, give upper
  // if std equal check is fine, return isTypeInferredByTypealias

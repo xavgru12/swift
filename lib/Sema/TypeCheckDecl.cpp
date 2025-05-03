@@ -3078,10 +3078,18 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
 
 llvm::SmallVector<swift::GenericTypeParamType *, 4> mutableNominalParams(
-    nominalGenericParams.rbegin(), nominalGenericParams.rend());
+    nominalGenericParams.begin(), nominalGenericParams.end());
 
 llvm::SmallVector<swift::GenericTypeParamType *, 4> mutableTypealiasParams(
-    typealiasGenericParams.rbegin(), typealiasGenericParams.rend());
+    typealiasGenericParams.begin(), typealiasGenericParams.end());
+
+
+  //  for (const auto& type :types){
+  //    if (type->getDepth() == maxDepth)
+  //    {
+  //      types.pop_back();
+  //    }
+  //  }
 
  // check for size equality of these two new types , if true, succeed with std equal, if wrong, give upper
  // if std equal check is fine, return isTypeInferredByTypealias

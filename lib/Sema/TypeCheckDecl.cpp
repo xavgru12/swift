@@ -3084,6 +3084,8 @@ llvm::SmallVector<swift::GenericTypeParamType *, 4> mutableTypealiasParams(
     typealiasGenericParams.begin(), typealiasGenericParams.end());
 
 
+  //typealiasGenericParams.pop_back(); // does not work
+
   for (const auto& type :mutableNominalParams){
     if (type->getDepth() == maxDepth)
     {

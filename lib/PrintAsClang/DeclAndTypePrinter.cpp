@@ -1783,7 +1783,7 @@ public:
         continue;
       }
 
-      const char *plat;
+      const char *plat = nullptr;
       switch (AvAttr.getPlatform()) {
       case PlatformKind::macOS:
         plat = "macos";

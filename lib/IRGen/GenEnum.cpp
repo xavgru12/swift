@@ -2671,8 +2671,8 @@ namespace {
         if (Refcounting == ReferenceCounting::Custom) {
           Explosion e;
           e.add(ptr);
-          getPayloadTypeInfo().as<ClassTypeInfo>().strongCustomRetain(
-              IGF, e, /*needsNullCheck*/ true);
+          getPayloadTypeInfo().strongCustomRetain(IGF, e,
+                                                  /*needsNullCheck*/ true);
           return;
         }
 
@@ -2708,8 +2708,8 @@ namespace {
         if (Refcounting == ReferenceCounting::Custom) {
           Explosion e;
           e.add(ptr);
-          getPayloadTypeInfo().as<ClassTypeInfo>().strongCustomRelease(
-              IGF, e, /*needsNullCheck*/ true);
+          getPayloadTypeInfo().strongCustomRelease(IGF, e,
+                                                   /*needsNullCheck*/ true);
           return;
         }
 
@@ -6429,6 +6429,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   // fixed-size from this resilience scope.
   ResilienceExpansion layoutScope =
       TC.IGM.getResilienceExpansionForLayout(theEnum);
+  // TODO: [availability] Only enumerate the elements available during lowering.
   for (auto elt : theEnum->getAllElements()) {
     ++numElements;
 

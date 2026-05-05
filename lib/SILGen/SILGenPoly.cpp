@@ -494,6 +494,14 @@ ManagedValue Transform::transform(ManagedValue v,
     }
   }
 
+  // A borrow accessor with non-address result cannot witness a protocol
+  // requirement with address result.
+  if (v.getFunction()->getConventionsInContext().hasGuaranteedAddressResult() &&
+      loweredResultTy.isAddress() && !v.getType().isAddress()) {
+    SGF.SGM.diagnose(Loc, diag::unsupported_borrow_abstraction, inputSubstType);
+    return SGF.emitUndef(loweredResultTy);
+  }
+
   // Downstream code expects the lowered result type to be an object if
   // it's loadable, so make sure that's satisfied.
   auto &expectedTL = SGF.getTypeLowering(loweredResultTy);
@@ -647,11 +655,9 @@ ManagedValue Transform::transform(ManagedValue v,
         llvm::report_fatal_error("unsupported collection upcast kind");
       }
 
-      return SGF
-          .emitCollectionConversion(Loc, fn, inputSubstType, outputSubstType, v,
-                                    /*keyConversion*/ nullptr,
-                                    /*valueConversion*/ nullptr, ctxt)
-          .getScalarValue();
+      return SGF.emitCollectionConversion(Loc, fn, inputSubstType,
+                                          outputSubstType, v, ctxt)
+                .getScalarValue();
     }
   }
 
@@ -699,9 +705,22 @@ ManagedValue Transform::transform(ManagedValue v,
 
   //  - existentials
   if (outputSubstType->isAnyExistentialType()) {
-    // We have to re-abstract payload if its a metatype or a function
-    v = SGF.emitSubstToOrigValue(Loc, v, AbstractionPattern::getOpaque(),
-                                 inputSubstType);
+    // We might have to re-abstract the payload if its a metatype, function,
+    // tuple, or optional.
+
+    auto loweredTy = v.getType();
+    auto inputLoweredTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                             inputSubstType);
+    // FIXME: Gross workaround for incorrect opaque type erasure
+    if (loweredTy.getNominalOrBoundGenericNominal() &&
+        inputLoweredTy.is<OpaqueTypeArchetypeType>()) {
+      // Woohoo!
+      inputSubstType = loweredTy.getASTType();
+    } else {
+      v = SGF.emitSubstToOrigValue(Loc, v, AbstractionPattern::getOpaque(),
+                                   inputSubstType);
+    }
+
     return SGF.emitTransformExistential(Loc, v,
                                         inputSubstType, outputSubstType,
                                         ctxt);
@@ -2981,7 +3000,8 @@ forwardFunctionArguments(SILGenFunction &SGF, SILLocation loc,
     if (isGuaranteedParameterInCallee(argTy.getConvention())) {
       auto forwardedArg =
           SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue();
-      if (fTy->hasGuaranteedResult(/*loweredAddresses*/ true)) {
+      if (forwardedArg->getType().isObject() &&
+          fTy->hasGuaranteedResult(/*loweredAddresses*/ true)) {
         forwardedArg = SGF.B.createUncheckedOwnership(loc, forwardedArg);
       }
       forwardedArgs.push_back(forwardedArg);
@@ -5302,8 +5322,9 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
     case ResultConvention::Unowned: // Handled in OwnershipModelEliminator.
     case ResultConvention::GuaranteedAddress:
     case ResultConvention::Inout:
-    case ResultConvention::Guaranteed:
       return SGF.emitManagedRValueWithCleanup(resultValue, resultTL);
+    case ResultConvention::Guaranteed:
+      return ManagedValue::forBorrowedObjectRValue(resultValue);
     case ResultConvention::Pack:
       llvm_unreachable("shouldn't have direct result with pack results");
     case ResultConvention::UnownedInnerPointer:
@@ -6038,6 +6059,9 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
 
   FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
 
+  using ThunkGenFlag = SILGenFunction::ThunkGenFlag;
+  auto options = SILGenFunction::ThunkGenOptions();
+
   SmallVector<ManagedValue, 8> params;
   SmallVector<ManagedValue, 8> indirectResults;
   SmallVector<ManagedValue, 1> indirectErrorResults;
@@ -6067,10 +6091,11 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
   // Forward the implicit isolation parameter.
   if (implicitIsolationParam.isValid()) {
     argValues.push_back(implicitIsolationParam.getValue());
+    options |= ThunkGenFlag::CalleeHasImplicitIsolatedParam;
   }
 
    // Add the rest of the arguments.
-  forwardFunctionArguments(SGF, loc, fnType, params, argValues);
+  forwardFunctionArguments(SGF, loc, fnType, params, argValues, options);
 
   auto fun = fnType->isCalleeGuaranteed() ? fnValue.borrow(SGF, loc).getValue()
                                           : fnValue.forward(SGF);
@@ -6229,7 +6254,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   auto loc = F.getLocation();
   SILGenFunctionBuilder fb(SGM);
   auto *thunk = fb.getOrCreateSharedFunction(
-      loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
+    loc, name, thunkDeclType, F.getActorIsolation(), IsBare, IsTransparent, IsSerialized,
       ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed,
       IsNotRuntimeAccessible);
 
@@ -6587,13 +6612,13 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   // linkage of derivative thunks so we can serialize them (the original
   // function itself might be HiddenExternal in this case if we only have
   // declaration without definition).
-  auto linkage = originalFn->markedAsAlwaysEmitIntoClient()
+  auto linkage = originalFn->isAlwaysEmitIntoClient()
                      ? SILLinkage::PublicNonABI
                      : stripExternalFromLinkage(originalFn->getLinkage());
 
   auto *thunk = fb.getOrCreateFunction(
-      loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent,
-      customDerivativeFn->getSerializedKind(),
+      loc, name, linkage, thunkFnTy, customDerivativeFn->getActorIsolation(),
+      IsBare, IsNotTransparent, customDerivativeFn->getSerializedKind(),
       customDerivativeFn->isDynamicallyReplaceable(),
       customDerivativeFn->isDistributed(),
       customDerivativeFn->isRuntimeAccessible(),
@@ -7144,6 +7169,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
       switch (baseIsolation) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedConcurrent:
       case ActorIsolation::NonisolatedUnsafe:
         return emitNonIsolatedIsolation(loc).getValue();
       case ActorIsolation::Erased:
@@ -7154,11 +7180,12 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
         return emitGlobalActorIsolation(loc, globalActor).getValue();
       }
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::CallerIsolationInheriting: {
+      case ActorIsolation::NonisolatedNonsending: {
         auto derivedIsolation = getDerivedIsolation();
         switch (derivedIsolation) {
         case ActorIsolation::Unspecified:
         case ActorIsolation::Nonisolated:
+        case ActorIsolation::NonisolatedConcurrent:
         case ActorIsolation::NonisolatedUnsafe:
           return emitNonIsolatedIsolation(loc).getValue();
         case ActorIsolation::Erased:
@@ -7170,7 +7197,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
           return emitGlobalActorIsolation(loc, globalActor).getValue();
         }
         case ActorIsolation::ActorInstance:
-        case ActorIsolation::CallerIsolationInheriting: {
+        case ActorIsolation::NonisolatedNonsending: {
           auto isolatedArg = F.maybeGetIsolatedArgument();
           assert(isolatedArg);
           return isolatedArg;
@@ -7185,8 +7212,8 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     // If our derived isolation is caller isolation inheriting and our base
     // isn't, we need to insert a hop so that derived can assume that it does
     // not have to hop in its prologue.
-    if (!baseIsolation.isCallerIsolationInheriting() &&
-        getDerivedIsolation().isCallerIsolationInheriting()) {
+    if (!baseIsolation.isNonisolatedNonsending() &&
+        getDerivedIsolation().isNonisolatedNonsending()) {
       B.createHopToExecutor(loc, args.back(), false /*mandatory*/);
     }
   }
@@ -7455,6 +7482,14 @@ void SILGenFunction::emitProtocolWitness(
   // Grab the type of our thunk.
   auto thunkTy = F.getLoweredFunctionType();
 
+  // The protocol conditional conformance itself might bring some T :
+  // Differentiable conformances. They are already added to the derivative
+  // generic signature. Update witness substitution map generic signature to
+  // have them as well.
+  if (auto *derivativeId = witness.getDerivativeFunctionIdentifier())
+    witnessSubs = SubstitutionMap::get(derivativeId->getDerivativeGenericSignature(),
+                                       witnessSubs);
+  
   // Then get the type of the witness.
   auto witnessKind = getWitnessDispatchKind(witness, isSelfConformance);
   auto witnessInfo = getConstantInfo(getTypeExpansionContext(), witness);
@@ -7646,6 +7681,7 @@ void SILGenFunction::emitProtocolWitness(
       switch (reqtIsolation) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedConcurrent:
       case ActorIsolation::NonisolatedUnsafe:
         return emitNonIsolatedIsolation(loc).getValue();
       case ActorIsolation::Erased:
@@ -7656,11 +7692,12 @@ void SILGenFunction::emitProtocolWitness(
         return emitGlobalActorIsolation(loc, globalActor).getValue();
       }
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::CallerIsolationInheriting: {
+      case ActorIsolation::NonisolatedNonsending: {
         auto witnessIsolation = getWitnessIsolation();
         switch (witnessIsolation) {
         case ActorIsolation::Unspecified:
         case ActorIsolation::Nonisolated:
+        case ActorIsolation::NonisolatedConcurrent:
         case ActorIsolation::NonisolatedUnsafe:
           return emitNonIsolatedIsolation(loc).getValue();
         case ActorIsolation::Erased:
@@ -7672,7 +7709,7 @@ void SILGenFunction::emitProtocolWitness(
           return emitGlobalActorIsolation(loc, globalActor).getValue();
         }
         case ActorIsolation::ActorInstance:
-        case ActorIsolation::CallerIsolationInheriting: {
+        case ActorIsolation::NonisolatedNonsending: {
           auto isolatedArg = F.maybeGetIsolatedArgument();
           assert(isolatedArg);
           return isolatedArg;
@@ -7688,8 +7725,8 @@ void SILGenFunction::emitProtocolWitness(
     // isolation is caller isolation inheriting, hop onto the reqtIsolation so
     // that it is safe for our witness to assume that it is already on its
     // actor.
-    if (!reqtIsolation.isCallerIsolationInheriting() &&
-        getWitnessIsolation().isCallerIsolationInheriting()) {
+    if (!reqtIsolation.isNonisolatedNonsending() &&
+        getWitnessIsolation().isNonisolatedNonsending()) {
       B.createHopToExecutor(loc, args.back(), false /*mandatory*/);
     }
   }

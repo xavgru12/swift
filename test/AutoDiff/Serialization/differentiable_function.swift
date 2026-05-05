@@ -1,11 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
-// RUN: llvm-bcanalyzer %t/differentiable_function.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/differentiable_function.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-sil-opt -enable-sil-verify-all %t/differentiable_function.swiftmodule -o - | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
-
-// UNSUPPORTED: OS=wasip1
 
 import _Differentiation
 

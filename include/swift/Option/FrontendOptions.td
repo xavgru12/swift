@@ -373,44 +373,44 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     HelpText<"Disable requiring uses of @objc to require importing the "
              "Foundation module">;
 
-def enable_experimental_concurrency :
-  Flag<["-"], "enable-experimental-concurrency">,
-  HelpText<"Enable experimental concurrency model">;
+  def enable_experimental_concurrency :
+    Flag<["-"], "enable-experimental-concurrency">,
+    HelpText<"Enable experimental concurrency model">;
 
-def enable_experimental_move_only :
-  Flag<["-"], "enable-experimental-move-only">,
-  HelpText<"Enable experimental move only">;
+  def enable_experimental_move_only :
+    Flag<["-"], "enable-experimental-move-only">,
+    HelpText<"Enable experimental move only">;
 
-def enable_experimental_distributed :
-  Flag<["-"], "enable-experimental-distributed">,
-  HelpText<"Enable experimental 'distributed' actors and functions">;
+  def enable_experimental_distributed :
+    Flag<["-"], "enable-experimental-distributed">,
+    HelpText<"Enable experimental 'distributed' actors and functions">;
 
-def enable_experimental_flow_sensitive_concurrent_captures :
-  Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
-  HelpText<"Enable flow-sensitive concurrent captures">;
+  def enable_experimental_flow_sensitive_concurrent_captures :
+    Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
+    HelpText<"Enable flow-sensitive concurrent captures">;
 
-def disable_experimental_clang_importer_diagnostics :
-  Flag<["-"], "disable-experimental-clang-importer-diagnostics">,
-  HelpText<"Disable experimental diagnostics when importing C, C++, and Objective-C libraries">;
+  def disable_experimental_clang_importer_diagnostics :
+    Flag<["-"], "disable-experimental-clang-importer-diagnostics">,
+    HelpText<"Disable experimental diagnostics when importing C, C++, and Objective-C libraries">;
 
-def enable_experimental_eager_clang_module_diagnostics :
-  Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
-  HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
+  def enable_experimental_eager_clang_module_diagnostics :
+    Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
+    HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
 
-def enable_experimental_pairwise_build_block :
-  Flag<["-"], "enable-experimental-pairwise-build-block">,
-  HelpText<"Enable experimental pairwise 'buildBlock' for result builders">;
+  def enable_experimental_pairwise_build_block :
+    Flag<["-"], "enable-experimental-pairwise-build-block">,
+    HelpText<"Enable experimental pairwise 'buildBlock' for result builders">;
 
-def enable_resilience : Flag<["-"], "enable-resilience">,
-     HelpText<"Deprecated, use -enable-library-evolution instead">;
+  def enable_resilience : Flag<["-"], "enable-resilience">,
+       HelpText<"Deprecated, use -enable-library-evolution instead">;
 
-def enable_experimental_async_top_level :
-  Flag<["-"], "enable-experimental-async-top-level">,
-  HelpText<"Enable experimental concurrency in top-level code">;
+  def enable_experimental_async_top_level :
+    Flag<["-"], "enable-experimental-async-top-level">,
+    HelpText<"Enable experimental concurrency in top-level code">;
 
-def public_autolink_library :
-  Separate<["-"], "public-autolink-library">,
-  HelpText<"Add public dependent library">;
+  def public_autolink_library :
+    Separate<["-"], "public-autolink-library">,
+    HelpText<"Add public dependent library">;
 }
 
 // HIDDEN FLAGS
@@ -438,8 +438,23 @@ def solver_shuffle_disjunctions_EQ : Joined<["-"], "solver-shuffle-disjunctions=
 def solver_shuffle_choices_EQ : Joined<["-"], "solver-shuffle-choices=">,
   HelpText<"Random seed for shuffling disjunction choices. For debugging solver performance">;
 
-def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
-  HelpText<"Disable per-name lazy member loading (obsolete)">;
+def solver_enable_crash_on_valid_salvage : Flag<["-"], "solver-enable-crash-on-valid-salvage">,
+  HelpText<"Reject valid solutions in diagnostic mode">;
+
+def solver_disable_crash_on_valid_salvage : Flag<["-"], "solver-disable-crash-on-valid-salvage">,
+  HelpText<"Accept valid solutions in diagnostic mode">;
+
+def solver_enable_transitive_conformance : Flag<["-"], "solver-enable-transitive-conformance">,
+  HelpText<"Enable transitive conformance constraint optimization">;
+
+def solver_disable_transitive_conformance : Flag<["-"], "solver-disable-transitive-conformance">,
+  HelpText<"Disable transitive conformance constraint optimization">;
+
+def solver_enable_binding_optimizations : Flag<["-"], "solver-enable-binding-optimizations">,
+  HelpText<"Enable experimental optimizations to speed up type variable binding">;
+
+def solver_disable_binding_optimizations : Flag<["-"], "solver-disable-binding-optimizations">,
+  HelpText<"Disable experimental optimizations to speed up type variable binding">;
 
 def disable_named_lazy_import_as_member_loading :
   Flag<["-"], "disable-named-lazy-import-as-member-loading">,
@@ -896,6 +911,18 @@ def warn_long_expression_type_checking : Separate<["-"], "warn-long-expression-t
 def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-type-checking=">,
   Alias<warn_long_expression_type_checking>;
 
+def warn_long_expression_type_checking_scopes : Separate<["-"], "warn-long-expression-type-checking-scopes">,
+  MetaVarName<"<n>">,
+  HelpText<"Warns when type-checking an expression uses more than <n> solver scopes">;
+def warn_long_expression_type_checking_scopes_EQ : Joined<["-"], "warn-long-expression-type-checking-scopes=">,
+  Alias<warn_long_expression_type_checking_scopes>;
+
+def warn_long_expression_type_checking_trail : Separate<["-"], "warn-long-expression-type-checking-trail">,
+  MetaVarName<"<n>">,
+  HelpText<"Warns when type-checking an expression uses more than <n> solver trail steps">;
+def warn_long_expression_type_checking_trail_EQ : Joined<["-"], "warn-long-expression-type-checking-trail=">,
+  Alias<warn_long_expression_type_checking_trail>;
+
 def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
   HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;
 
@@ -929,12 +956,22 @@ def solver_disable_prune_disjunctions : Flag<["-"], "solver-disable-prune-disjun
 def solver_enable_prune_disjunctions : Flag<["-"], "solver-enable-prune-disjunctions">,
   HelpText<"Enable experimental disjunction pruning algorithm for lookahead in the solver">;
 
+def solver_disable_optimize_operator_defaults : Flag<["-"], "solver-disable-optimize-operator-defaults">,
+  HelpText<"Disable experimental optimization to sometimes skip operators in protocol extensions">;
+
+def solver_enable_optimize_operator_defaults : Flag<["-"], "solver-enable-optimize-operator-defaults">,
+  HelpText<"Enable experimental optimization to sometimes skip operators in protocol extensions">;
+
+def solver_disable_performance_hacks : Flag<["-"], "solver-disable-performance-hacks">,
+  HelpText<"Disable various constraint solver performance optimizations that have been "
+           "subsumed by subsequent improvements">;
+
+def solver_enable_performance_hacks : Flag<["-"], "solver-enable-performance-hacks">,
+  HelpText<"Enble various constraint solver performance optimizations that have been "
+           "subsumed by subsequent improvements">;
+
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
-
-def enable_operator_designated_types :
-  Flag<["-"], "enable-operator-designated-types">,
-  HelpText<"Enable operator designated types">;
 
 def enable_invalid_ephemeralness_as_error :
   Flag<["-"], "enable-invalid-ephemeralness-as-error">,
@@ -975,6 +1012,9 @@ def import_module : Separate<["-"], "import-module">,
 
 def testable_import_module : Separate<["-"], "testable-import-module">,
   HelpText<"Implicitly import the specified module with @testable">;
+
+def dependency_only_import : Separate<["-"], "dependency-only-import">,
+                             HelpText<"Import the module as a dependency only">;
 
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;

@@ -1810,6 +1810,13 @@ ManglingError Remangler::mangleImplEscaping(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError
+Remangler::mangleImplNonisolatedNonsendingIsolation(Node *node,
+                                                    unsigned depth) {
+  // The old mangler does not encode nonisolated(nonsending).
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
   // The old mangler does not encode @isolated(any).
   return ManglingError::Success;
@@ -2996,8 +3003,8 @@ ManglingError Remangler::mangleGlobalVariableOnceDeclList(Node *node,
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError
-Remangler::manglePredefinedObjCAsyncCompletionHandlerImpl(Node *node,
-                                                          unsigned depth) {
+Remangler::mangleCheckedObjCAsyncCompletionHandlerImpl(Node *node,
+                                                       unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node,

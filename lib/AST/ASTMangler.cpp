@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -606,16 +607,16 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
 
 std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
     CanSILFunctionType BlockType, CanType ResultType, CanGenericSignature Sig,
-    std::optional<bool> ErrorOnZero, bool predefined) {
+    std::optional<bool> ErrorOnZero, bool checked) {
   beginMangling();
   appendType(BlockType, Sig);
   appendType(ResultType, Sig);
   if (Sig)
     appendGenericSignature(Sig);
   if (ErrorOnZero)
-    appendOperator(predefined ? "TZ" : "Tz", Index(*ErrorOnZero + 1));
+    appendOperator(checked ? "TZ" : "Tz", Index(*ErrorOnZero + 1));
   else
-    appendOperator(predefined ? "TZ" : "Tz", Index(0));
+    appendOperator(checked ? "TZ" : "Tz", Index(0));
   return finalize();
 }
 
@@ -1395,13 +1396,21 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
   TypeBase *tybase = type.getPointer();
   switch (type->getKind()) {
     case TypeKind::TypeVariable:
-      llvm_unreachable("mangling type variable");
-
+    case TypeKind::Join:
+    case TypeKind::Meet:
     case TypeKind::ErrorUnion:
-      llvm_unreachable("Error unions should not persist to mangling");
-
     case TypeKind::Module:
-      llvm_unreachable("Cannot mangle module type yet");
+    case TypeKind::BuiltinUnboundGeneric:
+    case TypeKind::PrimaryArchetype:
+    case TypeKind::PackArchetype:
+    case TypeKind::ElementArchetype:
+    case TypeKind::ExistentialArchetype:
+    case TypeKind::SILMoveOnlyWrapped:
+    case TypeKind::SILBlockStorage:
+      ABORT([&](llvm::raw_ostream &out) {
+        out << "Cannot mangle this kind of type:\n";
+        type->dump(out);
+      });
 
     case TypeKind::Error:
     case TypeKind::Placeholder:
@@ -1452,8 +1461,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendOperator("Bb");
     case TypeKind::BuiltinUnsafeValueBuffer:
       return appendOperator("BB");
-    case TypeKind::BuiltinUnboundGeneric:
-      ABORT("Don't know how to mangle a BuiltinUnboundGenericType");
     case TypeKind::Locatable: {
       auto loc = cast<LocatableType>(tybase);
       return appendType(loc->getSinglyDesugaredType(), sig, forDecl);
@@ -1765,15 +1772,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
                                     forDecl);
 
       // type ::= archetype
-    case TypeKind::PrimaryArchetype:
-    case TypeKind::PackArchetype:
-    case TypeKind::ElementArchetype:
-    case TypeKind::ExistentialArchetype:
-      ABORT([&](auto &out) {
-        out << "Cannot mangle free-standing archetype: ";
-        tybase->dump(out);
-      });
-
     case TypeKind::OpaqueTypeArchetype: {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
       auto opaqueDecl = opaqueType->getDecl();
@@ -1893,12 +1891,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       return;
     }
-
-    case TypeKind::SILMoveOnlyWrapped:
-      // If we hit this, we just mangle the underlying name and move on.
-      llvm_unreachable("should never be mangled?");
-    case TypeKind::SILBlockStorage:
-      llvm_unreachable("should never be mangled");
   }
   llvm_unreachable("bad type kind");
 }
@@ -2325,6 +2317,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
 
   switch (fn->getIsolation().getKind()) {
   case SILFunctionTypeIsolation::Unknown:
+    break;
+  case SILFunctionTypeIsolation::NonisolatedNonsending:
+    OpArgs.push_back('N');
     break;
   case SILFunctionTypeIsolation::Erased:
     if (AllowIsolatedAny)
@@ -2967,7 +2962,7 @@ static void reconcileInverses(
       if (baseSig && baseSig->requiresProtocol(inv.subject, inv.protocol))
         return true;
 
-      auto gp = inv.subject->castTo<GenericTypeParamType>();
+      auto gp = inv.subject->getRootGenericParam();
 
       // Remove inverses that were either already mangled for this entity,
       // or chosen not to be included in the output.
@@ -4045,7 +4040,7 @@ ASTMangler::dropProtocolsFromAssociatedTypes(Type type,
   if (!OptimizeProtocolNames || !sig)
     return type;
 
-  if (!type->hasDependentMember())
+  if (!type->hasTypeParameter())
     return type;
 
   return type.transformRec([&](TypeBase *t) -> std::optional<Type> {

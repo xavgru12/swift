@@ -279,7 +279,9 @@ types where the metadata itself has unknown layout.)
   global ::= assoc-type-name 'Tl'        // associated type descriptor
   global ::= assoc-type-name 'TM'        // default associated type witness accessor (HISTORICAL)
   global ::= type assoc-type-list protocol 'Tn' // associated conformance descriptor
+  global ::= type type protocol 'Tn'            // associated conformance descriptor (with generic type parameter as subject)
   global ::= type assoc-type-list protocol 'TN' // default associated conformance witness accessor
+  global ::= type type protocol 'TN'            // default associated conformance witness accessor (with generic type parameter as subject)
   global ::= type protocol 'Tb'          // base conformance descriptor
 
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk
@@ -869,6 +871,9 @@ mangled in to disambiguate.
   CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)
 
   ISOLATION ::= 'A'                          // @isolated(any)
+#if SWIFT_RUNTIME_VERSION >= 6.4
+  ISOLATION ::= 'N'                          // nonisolated(nonsending)
+#endif
 
   DIFFERENTIABILITY-KIND ::= 'd'             // @differentiable
   DIFFERENTIABILITY-KIND ::= 'l'             // @differentiable(_linear)

@@ -839,6 +839,11 @@ static llvm::cl::opt<std::string>
                       llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
+    DisableSafeInterop("disable-safe-interop-wrappers",
+                       llvm::cl::desc("Disable safe interop wrappers."),
+                       llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
     CxxInteropGettersSettersAsProperties("cxx-interop-getters-setters-as-properties",
         llvm::cl::desc("Imports getters and setters as computed properties."),
         llvm::cl::cat(Category), llvm::cl::init(false));
@@ -1169,7 +1174,7 @@ static bool performWithCompletionLikeOperationParams(
 
   CompletionLikeOperationParams Params{Invocation,
                                        /*Args=*/{},
-                                       llvm::vfs::getRealFileSystem(),
+                                       llvm::vfs::createPhysicalFileSystem(),
                                        CompletionBuffer.get(),
                                        Offset,
                                        CodeCompletionDiagnostics ? &PrintDiags
@@ -1709,7 +1714,8 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
   }
 
   CompilerInvocation Invocation(InitInvok);
-  auto FileSystem = llvm::vfs::getRealFileSystem();
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem =
+      llvm::vfs::createPhysicalFileSystem();
 
   IDEInspectionInstance IDEInspectionInst(std::make_shared<PluginRegistry>());
 
@@ -4579,6 +4585,9 @@ int main(int argc, char *argv[]) {
 
   InitInvok.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
 
+  if (options::DisableSafeInterop)
+    InitInvok.getLangOptions().DisableSafeInteropWrappers = true;
+
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
 
@@ -4770,10 +4779,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (InitInvok.getLangOptions().EnableCXXInterop) {
-    InitInvok.computeCXXStdlibOptions();
-  }
-
+  InitInvok.computeCXXStdlibOptions();
   InitInvok.computeAArch64TBIOptions();
 
   if (!options::InProcessPluginServerPath.empty()) {

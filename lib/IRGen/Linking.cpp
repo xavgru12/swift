@@ -633,9 +633,7 @@ static bool isLazyEmissionOfPublicSymbolInMultipleModulesPossible(CanType ty) {
   // In embedded existenitals mode we generate lazy public metadata on demand
   // which makes it non unique.
   auto &langOpts = ty->getASTContext().LangOpts;
-  auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
-    langOpts.hasFeature(Feature::EmbeddedExistentials);
-  if (isEmbeddedWithExistentials) {
+  if (langOpts.hasFeature(Feature::Embedded)) {
     if (auto nominal = ty->getAnyNominal()) {
       if (SILDeclRef::declHasNonUniqueDefinition(nominal)) {
         return true;
@@ -1149,9 +1147,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata: {
       auto &langOpts = IGM.Context.LangOpts;
-      auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
-        langOpts.hasFeature(Feature::EmbeddedExistentials);
-      if (isEmbeddedWithExistentials) {
+      if (langOpts.hasFeature(Feature::Embedded)) {
         return IGM.EmbeddedExistentialsMetadataStructTy;
       }
       if (getType().getClassOrBoundGenericClass())
@@ -1480,12 +1476,24 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
       return true;
 
     auto assocConformance = getAssociatedConformance();
+
+    auto &ctx = getDecl()->getASTContext();
+    if (assocConformance.first->isEqual(ctx.TheSelfType))
+      return cast<ProtocolDecl>(assocConformance.second)->isWeakImported(module);
+
     auto *depMemTy = assocConformance.first->castTo<DependentMemberType>();
     return depMemTy->getAssocType()->isWeakImported(module);
   }
 
-  case Kind::BaseConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor: {
+    auto baseProto = getAssociatedConformance().second;
+
+    // The base protocol might be reparented and less available.
+    if (baseProto->isWeakImported(module))
+      return true;
+
     return cast<ProtocolDecl>(getDecl())->isWeakImported(module);
+  }
 
   case Kind::TypeMetadata:
   case Kind::TypeMetadataAccessFunction: {

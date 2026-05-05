@@ -358,6 +358,9 @@ class Remangler : public RemanglerBase {
     return mangleChildNodesReversed(FuncType, depth);
   }
 
+  ManglingError mangleAttachedMacro(Node *node, unsigned depth,
+                                    StringRef mangledChar);
+
   ManglingError mangleGenericSpecializationNode(Node *node,
                                                 char specKind,
                                                 unsigned depth);
@@ -1013,11 +1016,14 @@ ManglingError Remangler::mangleCoroutineContinuationPrototype(Node *node,
 }
 
 ManglingError
-Remangler::manglePredefinedObjCAsyncCompletionHandlerImpl(Node *node,
-                                                          unsigned depth) {
-  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+Remangler::mangleCheckedObjCAsyncCompletionHandlerImpl(Node *node,
+                                                       unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  if (node->getNumChildren() == 4)
+    RETURN_IF_ERROR(mangleChildNode(node, 3, depth + 1));
   Buffer << "TZ";
-  return ManglingError::Success;
+  return mangleChildNode(node, 2, depth + 1);
 }
 
 ManglingError Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node,
@@ -1920,6 +1926,13 @@ ManglingError Remangler::mangleImplEscaping(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError
+Remangler::mangleImplNonisolatedNonsendingIsolation(Node *node,
+                                                    unsigned depth) {
+  Buffer << 'N';
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
   Buffer << 'A';
   return ManglingError::Success;
@@ -2128,6 +2141,9 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
         break;
       case Node::Kind::ImplErasedIsolation:
         Buffer << 'A';
+        break;
+      case Node::Kind::ImplNonisolatedNonsendingIsolation:
+        Buffer << 'N';
         break;
       case Node::Kind::ImplSendingResult:
         Buffer << 'T';
@@ -3248,15 +3264,22 @@ ManglingError Remangler::mangleFreestandingMacroExpansion(
   return mangleChildNode(node, 2, depth + 1);
 }
 
+ManglingError Remangler::mangleAttachedMacro(Node *node, unsigned depth,
+                                             StringRef mangledChar) {
+  unsigned idx = 0;
+  while (idx + 1 < node->getNumChildren()) {
+    RETURN_IF_ERROR(mangleChildNode(node, idx, depth));
+    idx += 1;
+  }
+  Buffer << "fM" << mangledChar;
+  return mangleChildNode(node, idx, depth);
+}
+
 #define FREESTANDING_MACRO_ROLE(Name, Description)
 #define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)    \
 ManglingError Remangler::mangle##Name##AttachedMacroExpansion( \
     Node *node, unsigned depth) {                              \
-  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));        \
-  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));        \
-  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));        \
-  Buffer << "fM" MangledChar;                                  \
-  return mangleChildNode(node, 3, depth + 1);                  \
+  return mangleAttachedMacro(node, depth + 1, MangledChar);    \
 }
 #include "swift/Basic/MacroRoles.def"
 
